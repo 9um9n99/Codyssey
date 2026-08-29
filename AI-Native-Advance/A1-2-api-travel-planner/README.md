@@ -40,5 +40,10 @@ KAKAO_API_KEY=발급받은_Kakao_REST_API_키
   - 요청 방식: **GET** — 검색어 하나만 전달하면 되고, 서버 상태를 바꾸는 요청이 아니므로 GET을 사용합니다.
   - 엔드포인트 예시: `https://dapi.kakao.com/v2/local/search/keyword.json?query=제주+맛집`
 
+## 설계 메모
+
+- **지도 API 추상화**: `search_restaurants`는 `PlaceSearchProvider`라는 공통 인터페이스를 통해 Kakao Local을 호출합니다. 나중에 Naver Local Search 등 다른 제공자로 바꾸고 싶다면, `PlaceSearchProvider`를 상속한 새 클래스(`search(city_name)` 메서드만 동일한 반환 형식으로 구현)를 만들고, `search_restaurants` 함수 안의 `provider = KakaoLocalProvider(...)` 한 줄만 교체하면 됩니다.
+- **지명 정규화**: LLM이 `"제주(서귀포 포함)"`, `"제주, 서귀포"`처럼 부가 설명이나 여러 지역을 함께 반환하는 경우를 대비해, `normalize_city_name()`이 괄호 안 내용과 쉼표/슬래시 이후 텍스트를 제거하고 대표 지역명 하나만 검색어로 사용합니다.
+
 ## 보너스: 결과 캐싱
 같은 --date로 재실행 시, results/ 폴더에 이미 저장된 JSON이 있으면 API 호출(LLM 1차 추천, 맛집 검색)을 건너뛰고 저장된 데이터로 리포트만 재생성합니다.

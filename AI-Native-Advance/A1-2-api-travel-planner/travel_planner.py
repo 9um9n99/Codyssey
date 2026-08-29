@@ -2,6 +2,7 @@ import argparse                    # 터미널 입력값(--date 등)을 받는 �
 from datetime import datetime      # 날짜 형식이 올바른지 검증하는 도구
 import sys                         # 프로그램을 즉시 종료시키는 도구
 import os
+import re                          # 지명 정규화용 (평가 항목 #17)
 import json                        # 문자열 ↔ 파이썬 딕셔너리 변환 도구
 from dotenv import load_dotenv
 import requests
@@ -109,47 +110,95 @@ def get_recommendation(date_str):
             }
 
 
+def normalize_city_name(city_name):
+    """LLM이 반환한 지명을 검색어로 쓰기 좋게 정규화 (평가 항목 #17 보완)
+
+    처리하는 케이스:
+    - 앞뒤 공백 제거
+    - 괄호 안 부가 설명 제거 (예: "제주(서귀포 포함)" -> "제주")
+    - 쉼표/슬래시/가운뎃점 등으로 여러 지역이 나열된 경우 첫 번째 지역만 사용
+      (예: "제주, 서귀포" -> "제주")
+    """
+    if not city_name or not isinstance(city_name, str):
+        return city_name
+
+    name = city_name.strip()
+    name = re.sub(r"\(.*?\)", "", name).strip()   # 괄호와 그 안 내용 제거
+
+    for separator in [",", "/", "·", " 및 ", " 그리고 "]:
+        if separator in name:
+            name = name.split(separator)[0].strip()
+
+    return name if name else city_name   # 정규화 결과가 빈 문자열이면 원본 유지
+
+
+class PlaceSearchProvider:
+    """지도/장소 검색 제공자의 공통 인터페이스 (평가 항목 #8 보완)
+
+    새로운 제공자(예: Naver Local Search)로 교체하고 싶으면,
+    이 클래스를 상속해서 search() 메서드만 동일한 형태로 구현하면 된다.
+    반환 형식은 항상 (restaurants: list, errors: list) 튜플로 통일한다.
+    """
+
+    def search(self, city_name):
+        raise NotImplementedError
+
+
+class KakaoLocalProvider(PlaceSearchProvider):
+    """Kakao Local API를 사용하는 장소 검색 제공자 구현체"""
+
+    def __init__(self, api_key):
+        self.api_key = api_key
+
+    def search(self, city_name):
+        """도시 이름으로 맛집 5곳을 검색. 실패하거나 0건이면 빈 리스트 반환."""
+        errors = []
+
+        try:
+            response = requests.get(
+                "https://dapi.kakao.com/v2/local/search/keyword.json",
+                headers={"Authorization": f"KakaoAK {self.api_key}"},
+                params={
+                    "query": f"{city_name} 맛집",
+                    "size": 5
+                }
+            )
+
+            if response.status_code == 401 or response.status_code == 403:
+                errors.append({"step": "place_search", "type": "AUTH_ERROR", "message": f"HTTP {response.status_code}"})
+                return [], errors
+
+            data = response.json()
+            documents = data.get("documents", [])
+
+            if len(documents) == 0:
+                errors.append({"step": "place_search", "type": "EMPTY_RESULT", "message": f"0 results for query={city_name} 맛집"})
+                return [], errors
+
+            restaurants = []
+            for place in documents:
+                restaurants.append({
+                    "name": place["place_name"],
+                    "address": place["address_name"],
+                    "category": place.get("category_name", ""),
+                    "url": place.get("place_url", ""),
+                    "x": place.get("x"),
+                    "y": place.get("y")
+                })
+
+            return restaurants, errors
+
+        except requests.exceptions.RequestException as e:
+            errors.append({"step": "place_search", "type": "NETWORK_ERROR", "message": str(e)})
+            return [], errors
+
+
 def search_restaurants(city_name):
-    """도시 이름으로 맛집 5곳을 검색. 실패하거나 0건이면 빈 리스트 반환."""
-    errors = []
-
-    try:
-        response = requests.get(
-            "https://dapi.kakao.com/v2/local/search/keyword.json",
-            headers={"Authorization": f"KakaoAK {KAKAO_API_KEY}"},
-            params={
-                "query": f"{city_name} 맛집",
-                "size": 5
-            }
-        )
-
-        if response.status_code == 401 or response.status_code == 403:
-            errors.append({"step": "place_search", "type": "AUTH_ERROR", "message": f"HTTP {response.status_code}"})
-            return [], errors
-
-        data = response.json()
-        documents = data.get("documents", [])
-
-        if len(documents) == 0:
-            errors.append({"step": "place_search", "type": "EMPTY_RESULT", "message": f"0 results for query={city_name} 맛집"})
-            return [], errors
-
-        restaurants = []
-        for place in documents:
-            restaurants.append({
-                "name": place["place_name"],
-                "address": place["address_name"],
-                "category": place.get("category_name", ""),
-                "url": place.get("place_url", ""),
-                "x": place.get("x"),
-                "y": place.get("y")
-            })
-
-        return restaurants, errors
-
-    except requests.exceptions.RequestException as e:
-        errors.append({"step": "place_search", "type": "NETWORK_ERROR", "message": str(e)})
-        return [], errors
+    """맛집 검색 진입점. 지금은 Kakao 제공자를 쓰지만,
+    다른 제공자로 바꾸려면 이 한 줄(provider = ...)만 바꾸면 된다. (평가 항목 #8)
+    """
+    provider = KakaoLocalProvider(KAKAO_API_KEY)
+    return provider.search(city_name)
 
 
 def build_restaurant_text(restaurants):
@@ -281,8 +330,12 @@ def main():
         recommendation = get_recommendation(travel_date)
         print(f"  - recommended_city: {recommendation['recommended_city']}")
 
+        search_city = normalize_city_name(recommendation['recommended_city'])   # (평가 항목 #17)
+        if search_city != recommendation['recommended_city']:
+            print(f"  - 검색어 정규화: {recommendation['recommended_city']} -> {search_city}")
+
         print("[2/3] 맛집 검색 중(지도/장소 API)...")
-        restaurants, place_errors = search_restaurants(recommendation['recommended_city'])
+        restaurants, place_errors = search_restaurants(search_city)
         if restaurants:
             print(f"  - 맛집 {len(restaurants)}곳 검색 완료")
         else:
