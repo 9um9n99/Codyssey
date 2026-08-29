@@ -11,6 +11,9 @@ API_KEY = os.getenv("OPENAI_API_KEY")
 KAKAO_API_KEY = os.getenv("KAKAO_API_KEY")
 BASE_URL = "https://copa.codyssey.kr/v1"
 
+REQUIRED_KEYS = ["recommended_city", "weather", "events", "reason"]   # 1차 추천 JSON이 반드시 가져야 할 키 목록
+
+
 def parse_arguments():
     parser = argparse.ArgumentParser(
         description="날짜를 입력하면 국내 여행지를 추천해주는 프로그램"
@@ -22,6 +25,7 @@ def parse_arguments():
     )
     return parser.parse_args()
 
+
 def validate_date(date_str):
     """날짜 형식이 YYYY-MM-DD인지 확인. 아니면 프로그램 종료."""
     try:
@@ -31,6 +35,19 @@ def validate_date(date_str):
         print(f"❌ 날짜 형식이 올바르지 않습니다: {date_str}")
         print("사용법: python3 travel_planner.py --date \"YYYY-MM-DD\"")
         sys.exit(1)   # 프로그램을 여기서 즉시 종료
+
+
+def validate_recommendation(data):
+    """1차 추천 JSON이 필수 키를 모두 갖췄고 타입이 맞는지 확인 (평가 항목 #7 보완)"""
+    if not isinstance(data, dict):
+        return False
+    for key in REQUIRED_KEYS:
+        if key not in data:
+            return False
+    if not isinstance(data.get("events"), list):   # events는 반드시 리스트여야 함
+        return False
+    return True
+
 
 def get_recommendation(date_str):
     """날짜를 받아서 LLM에게 여행지 추천을 요청하고, JSON으로 파싱해서 반환"""
@@ -59,19 +76,27 @@ def get_recommendation(date_str):
                 }
             )
             content = response.json()["choices"][0]["message"]["content"]
-            return json.loads(content)   # 성공하면 바로 함수 끝내고 반환
+            parsed = json.loads(content)
 
-        except json.JSONDecodeError:
+            if not validate_recommendation(parsed):   # 필수 키/타입 검증 (평가 항목 #7)
+                raise ValueError("필수 키 누락 또는 타입 불일치")
+
+            return parsed   # 성공하면 바로 함수 끝내고 반환
+
+        except (json.JSONDecodeError, ValueError):
             if attempt == 0:
-                print("  ⚠️ JSON 파싱 실패, 재시도 중...")
-                prompt = "이전 응답이 JSON 형식이 아니었습니다. 반드시 순수 JSON 객체만, 다른 설명 없이 다시 출력해주세요: " + prompt
+                print("  ⚠️ JSON 형식 또는 필수 키 검증 실패, 재시도 중...")
+                prompt = (
+                    "이전 응답이 JSON 형식이 아니거나 필수 키(recommended_city, weather, events, reason)가 "
+                    "빠져 있었습니다. 반드시 순수 JSON 객체만, 다른 설명 없이 다시 출력해주세요: " + prompt
+                )
             else:
-                print("  ❌ JSON 파싱 재시도도 실패. 기본값으로 진행합니다.")
+                print("  ❌ 재시도도 실패. 기본값으로 진행합니다.")
                 return {
                     "recommended_city": "정보 없음",
                     "weather": "정보 없음",
                     "events": [],
-                    "reason": "LLM 응답 파싱 실패"
+                    "reason": "LLM 응답 파싱/검증 실패"
                 }
 
         except requests.exceptions.RequestException as e:
@@ -82,6 +107,7 @@ def get_recommendation(date_str):
                 "events": [],
                 "reason": "네트워크 오류로 LLM 호출 실패"
             }
+
 
 def search_restaurants(city_name):
     """도시 이름으로 맛집 5곳을 검색. 실패하거나 0건이면 빈 리스트 반환."""
@@ -125,6 +151,7 @@ def search_restaurants(city_name):
         errors.append({"step": "place_search", "type": "NETWORK_ERROR", "message": str(e)})
         return [], errors
 
+
 def build_restaurant_text(restaurants):
     """맛집 리스트를 프롬프트에 넣기 좋은 텍스트로 변환. 0건이면 안내 문구 반환."""
     if not restaurants:
@@ -136,11 +163,23 @@ def build_restaurant_text(restaurants):
     return "\n".join(lines)
 
 
-def generate_report(date_str, recommendation, restaurants):
-    """1차 추천 + 맛집 리스트를 받아 최종 Markdown 리포트를 생성"""
+def build_error_text(errors):
+    """오류 목록을 리포트에 넣기 좋은 텍스트로 변환. 없으면 '오류 없음' 반환. (평가 항목 #9 보완)"""
+    if not errors:
+        return "오류 없음"
+
+    lines = []
+    for e in errors:
+        lines.append(f"- [{e.get('step')}] {e.get('type')}: {e.get('message')}")
+    return "\n".join(lines)
+
+
+def generate_report(date_str, recommendation, restaurants, errors):
+    """1차 추천 + 맛집 리스트 + 오류 목록을 받아 최종 Markdown 리포트를 생성"""
 
     restaurant_text = build_restaurant_text(restaurants)
     events_text = ", ".join(recommendation.get("events", []))
+    error_text = build_error_text(errors)   # (평가 항목 #9) 오류 요약을 리포트 프롬프트에 포함
 
     prompt = f"""
 아래 정보를 바탕으로 국내 여행 추천 리포트를 Markdown 형식으로 작성해줘.
@@ -153,6 +192,8 @@ def generate_report(date_str, recommendation, restaurants):
 [행사/축제] {events_text}
 [맛집 목록]
 {restaurant_text}
+[오류 요약]
+{error_text}
 
 리포트는 아래 섹션을 반드시 포함해줘:
 ## 추천 지역
@@ -161,6 +202,7 @@ def generate_report(date_str, recommendation, restaurants):
 ## 행사/축제
 ## 맛집 추천
 ## 1일 일정 제안 (오전/오후/저녁)
+## 오류 요약(errors)
 """
 
     try:
@@ -177,6 +219,7 @@ def generate_report(date_str, recommendation, restaurants):
         print(f"  ❌ 네트워크 오류로 리포트 생성 실패: {e}")
         return f"# 리포트 생성 실패\n\n네트워크 오류로 최종 리포트를 생성하지 못했습니다: {e}"
 
+
 def load_cached_data(date_str):
     """이미 저장된 원본 JSON이 있으면 읽어서 반환, 없으면 None 반환"""
     json_path = f"results/{date_str}_travel_plan.json"
@@ -185,6 +228,7 @@ def load_cached_data(date_str):
         with open(json_path, "r", encoding="utf-8") as f:
             return json.load(f)
     return None
+
 
 def save_results(date_str, recommendation, restaurants, place_errors, report):
     """원본 JSON과 최종 리포트를 results/ 폴더에 저장"""
@@ -207,6 +251,7 @@ def save_results(date_str, recommendation, restaurants, place_errors, report):
         f.write(report)
 
     return json_path, md_path
+
 
 def main():
     args = parse_arguments()
@@ -244,11 +289,12 @@ def main():
             print("  - 검색 결과 0건 또는 오류 발생, '데이터 없음'으로 진행")
 
     print("[3/3] 최종 리포트 생성 중(LLM)...")
-    report = generate_report(travel_date, recommendation, restaurants)
+    report = generate_report(travel_date, recommendation, restaurants, place_errors)
     print("  - 리포트 생성 완료")
 
     json_path, md_path = save_results(travel_date, recommendation, restaurants, place_errors, report)
     print(f"\n완료! {md_path} 를 확인하세요.")
+
 
 if __name__ == "__main__":
     main()
