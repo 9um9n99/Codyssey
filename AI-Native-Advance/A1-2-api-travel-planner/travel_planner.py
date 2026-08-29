@@ -224,7 +224,7 @@ def main():
 
     print(f"✅ 입력된 날짜: {travel_date}")
 
-    cached = load_cached_data(travel_date)   # ← 여기 추가!
+    cached = load_cached_data(travel_date)
 
     if cached:
         print("📦 캐시된 데이터 발견! API 호출을 건너뜁니다.")
