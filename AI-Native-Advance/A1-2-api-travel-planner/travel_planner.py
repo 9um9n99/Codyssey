@@ -5,10 +5,10 @@ import os
 import json                        # 문자열 ↔ 파이썬 딕셔너리 변환 도구
 from dotenv import load_dotenv
 import requests
-from datetime import datetime
 
 load_dotenv()
 API_KEY = os.getenv("OPENAI_API_KEY")
+KAKAO_API_KEY = os.getenv("KAKAO_API_KEY")
 BASE_URL = "https://copa.codyssey.kr/v1"
 
 def parse_arguments():
@@ -49,18 +49,18 @@ def get_recommendation(date_str):
 """
 
     for attempt in range(2):   # 0번째 = 1차 시도, 1번째 = 재시도 1회
-        response = requests.post(
-            f"{BASE_URL}/chat/completions",
-            headers={"Authorization": f"Bearer {API_KEY}"},
-            json={
-                "model": "gpt-5-mini",
-                "messages": [{"role": "user", "content": prompt}]
-            }
-        )
-        content = response.json()["choices"][0]["message"]["content"]
-
-        try:
+        try:                                                    # ← 추가
+            response = requests.post(
+                f"{BASE_URL}/chat/completions",
+                headers={"Authorization": f"Bearer {API_KEY}"},
+                json={
+                    "model": "gpt-5-mini",
+                    "messages": [{"role": "user", "content": prompt}]
+                }
+            )
+            content = response.json()["choices"][0]["message"]["content"]
             return json.loads(content)   # 성공하면 바로 함수 끝내고 반환
+
         except json.JSONDecodeError:
             if attempt == 0:
                 print("  ⚠️ JSON 파싱 실패, 재시도 중...")
@@ -74,7 +74,14 @@ def get_recommendation(date_str):
                     "reason": "LLM 응답 파싱 실패"
                 }
 
-KAKAO_API_KEY = os.getenv("KAKAO_API_KEY")   # 파일 위쪽 API_KEY 선언부 옆에 이 줄도 추가
+        except requests.exceptions.RequestException as e:       # ← 추가
+            print(f"  ❌ 네트워크 오류로 추천 생성 실패: {e}")     # ← 추가
+            return {                                             # ← 추가
+                "recommended_city": "정보 없음",                  # ← 추가
+                "weather": "정보 없음",                           # ← 추가
+                "events": [],                                     # ← 추가
+                "reason": "네트워크 오류로 LLM 호출 실패"           # ← 추가
+            }                                                      # ← 추가
 
 def search_restaurants(city_name):
     """도시 이름으로 맛집 5곳을 검색. 실패하거나 0건이면 빈 리스트 반환."""
@@ -156,16 +163,19 @@ def generate_report(date_str, recommendation, restaurants):
 ## 1일 일정 제안 (오전/오후/저녁)
 """
 
-    response = requests.post(
-        f"{BASE_URL}/chat/completions",
-        headers={"Authorization": f"Bearer {API_KEY}"},
-        json={
-            "model": "gpt-5-mini",
-            "messages": [{"role": "user", "content": prompt}]
-        }
-    )
-
-    return response.json()["choices"][0]["message"]["content"]
+    try:
+        response = requests.post(
+            f"{BASE_URL}/chat/completions",
+            headers={"Authorization": f"Bearer {API_KEY}"},
+            json={
+                "model": "gpt-5-mini",
+                "messages": [{"role": "user", "content": prompt}]
+            }
+        )
+        return response.json()["choices"][0]["message"]["content"]
+    except requests.exceptions.RequestException as e:
+        print(f"  ❌ 네트워크 오류로 리포트 생성 실패: {e}")
+        return f"# 리포트 생성 실패\n\n네트워크 오류로 최종 리포트를 생성하지 못했습니다: {e}"
 
 def load_cached_data(date_str):
     """이미 저장된 원본 JSON이 있으면 읽어서 반환, 없으면 None 반환"""
