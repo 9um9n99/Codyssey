@@ -49,7 +49,7 @@ def get_recommendation(date_str):
 """
 
     for attempt in range(2):   # 0번째 = 1차 시도, 1번째 = 재시도 1회
-        try:                                                    # ← 추가
+        try:
             response = requests.post(
                 f"{BASE_URL}/chat/completions",
                 headers={"Authorization": f"Bearer {API_KEY}"},
@@ -74,14 +74,14 @@ def get_recommendation(date_str):
                     "reason": "LLM 응답 파싱 실패"
                 }
 
-        except requests.exceptions.RequestException as e:       # ← 추가
-            print(f"  ❌ 네트워크 오류로 추천 생성 실패: {e}")     # ← 추가
-            return {                                             # ← 추가
-                "recommended_city": "정보 없음",                  # ← 추가
-                "weather": "정보 없음",                           # ← 추가
-                "events": [],                                     # ← 추가
-                "reason": "네트워크 오류로 LLM 호출 실패"           # ← 추가
-            }                                                      # ← 추가
+        except requests.exceptions.RequestException as e:
+            print(f"  ❌ 네트워크 오류로 추천 생성 실패: {e}")
+            return {
+                "recommended_city": "정보 없음",
+                "weather": "정보 없음",
+                "events": [],
+                "reason": "네트워크 오류로 LLM 호출 실패"
+            }
 
 def search_restaurants(city_name):
     """도시 이름으로 맛집 5곳을 검색. 실패하거나 0건이면 빈 리스트 반환."""
