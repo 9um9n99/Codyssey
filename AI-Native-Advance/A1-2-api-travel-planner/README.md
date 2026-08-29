@@ -4,19 +4,19 @@
 
 ## 실행 방법
 
-\`\`\`bash
+```bash
 pip3 install requests python-dotenv
 python3 travel_planner.py --date "2026-03-15"
-\`\`\`
+```
 
 ## API 키 설정 방법
 
 프로젝트 루트에 `.env` 파일을 만들고 아래 내용을 채워주세요.
 
-\`\`\`
+```
 OPENAI_API_KEY=발급받은_OpenAI_계열_키
 KAKAO_API_KEY=발급받은_Kakao_REST_API_키
-\`\`\`
+```
 
 - OpenAI 계열 키: Codyssey 공개 API 콘솔(`/public-api-console`)에서 발급
 - Kakao 키: [Kakao Developers](https://developers.kakao.com)에서 앱 생성 후 REST API 키 발급, "카카오맵" 사용 설정을 켜야 합니다.
