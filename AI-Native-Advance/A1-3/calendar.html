@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>캘린더 — 조각조각</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Gaegu:wght@400;700&family=Pretendard&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <header class="site-header">
+    <a href="index.html" class="logo">🥒 조각조각</a>
+    <nav class="site-nav">
+      <a href="index.html" class="nav-link">메인</a>
+      <a href="cutting.html" class="nav-link">오이 썰기</a>
+      <a href="calendar.html" class="nav-link active">캘린더</a>
+      <a href="record.html" class="nav-link">오늘의 요리판</a>
+    </nav>
+  </header>
+
+  <main class="calendar-main">
+    <h1 class="calendar-title">이번 달, 오이가 이어지는 길</h1>
+    <p class="calendar-subtitle" id="calendar-subtitle"></p>
+
+    <!-- 진행 중인 계획이 없을 때 -->
+    <section class="empty-state" id="calendar-empty" hidden>
+      <p class="empty-emoji">📅</p>
+      <p class="empty-text">아직 진행 중인 오이가 없어요.</p>
+      <a href="cutting.html" class="btn-primary">오이 썰러 가기 →</a>
+    </section>
+
+    <!-- 달력 -->
+    <section id="calendar-wrap" hidden>
+      <div class="calendar-weekdays">
+        <span>일</span><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span>토</span>
+      </div>
+      <div class="calendar-grid" id="calendar-grid"></div>
+
+      <div class="calendar-legend" id="calendar-legend"></div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <p>🥒 조각조각 — Codyssey AI 웹 개발 미션 프로젝트</p>
+  </footer>
+
+  <script src="js/main.js"></script>
+  <script src="js/calendar.js"></script>
+</body>
+</html>
