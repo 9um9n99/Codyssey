@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>나의요리 — 조각조각</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Jua&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <header class="site-header">
+    <a href="index.html" class="logo">🥒 조각조각</a>
+    <nav class="site-nav">
+      <a href="index.html" class="nav-link">조각내기</a>
+      <a href="calendar.html" class="nav-link">조리하기</a>
+      <a href="record.html" class="nav-link active">나의요리</a>
+    </nav>
+  </header>
+
+  <main class="record-main">
+    <h1 class="record-title">나의요리</h1>
+    <p class="record-subtitle-plain">끝까지 완성한 목표가 요리가 되어 레시피북에 모여요.</p>
+
+    <!-- 진행 중 요리로 가는 길 -->
+    <a class="record-progress-link" id="record-progress-link" href="calendar.html" hidden></a>
+
+    <!-- 계획이 하나도 없을 때 -->
+    <section class="empty-state" id="empty-state" hidden>
+      <img src="images/marukajiri_kyuuri_girl.png" alt="" class="empty-image">
+      <p class="empty-text">아직 썰어본 오이가 없어요.</p>
+      <a href="index.html" class="btn-primary">첫 조각내러 가기 →</a>
+    </section>
+
+    <!-- 왼쪽: 나의 기록 트레이 / 오른쪽: 요리 레시피북 -->
+    <div class="record-layout">
+
+      <section class="record-list-panel">
+        <div class="record-panel-heading-row">
+          <h2 class="record-panel-heading">완성한 요리</h2>
+        </div>
+        <!-- 완성한 계획 리스트 (누르면 레시피북의 그 요리 페이지로 열림) -->
+        <div class="record-list" id="record-list"></div>
+        <p class="record-tab-empty" id="record-tab-empty" hidden></p>
+      </section>
+
+      <section class="book-panel">
+        <div class="recipe-book" id="recipe-book">
+          <div class="book-frame">
+
+            <!-- 표지 (처음엔 이게 덮고 있음, 아무 데나 클릭하면 열림) -->
+            <div class="book-view book-view--cover" id="book-cover-view" role="button" tabindex="0" aria-label="책 펼치기">
+              <img src="images/book-cover.jpg" alt="" class="book-cover-img">
+            </div>
+
+            <!-- 목차 뷰 -->
+            <div class="book-view book-view--toc" id="book-toc-view">
+              <h2 class="dex-heading">요리 레시피북</h2>
+              <div class="book-toc-wrap" id="book-toc-wrap"></div>
+              <div class="book-toc-pagination" id="book-toc-pagination">
+                <button type="button" class="book-page-arrow" id="book-toc-prev" aria-label="이전 페이지">←</button>
+                <div class="book-toc-page-dots" id="book-toc-page-dots"></div>
+                <button type="button" class="book-page-arrow" id="book-toc-next" aria-label="다음 페이지">→</button>
+              </div>
+            </div>
+
+            <!-- 상세 뷰 -->
+            <div class="book-view book-view--detail" id="book-detail-view">
+              <button type="button" class="book-back" id="book-back">← 목차로</button>
+              <div class="book-detail-photo-nav">
+                <button type="button" class="book-page-arrow" id="book-detail-prev" aria-label="이전 요리">←</button>
+                <div class="book-detail-photo">
+                  <img src="images/food_tsukemono_kyuuri.png" alt="" id="book-detail-photo-img">
+                </div>
+                <button type="button" class="book-page-arrow" id="book-detail-next" aria-label="다음 요리">→</button>
+              </div>
+              <p class="book-detail-number" id="book-detail-number"></p>
+              <h3 class="book-detail-name" id="book-detail-name"></h3>
+              <p class="book-detail-desc" id="book-detail-desc"></p>
+              <div class="book-detail-history">
+                <p class="book-detail-history-label">만든 기록</p>
+                <ol class="book-detail-history-list" id="book-detail-history-list"></ol>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </main>
+
+  <!-- 상세 모달 -->
+  <div class="modal-backdrop" id="modal-backdrop" hidden>
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modal-dish-name">
+      <button type="button" class="modal-close" id="modal-close" aria-label="닫기">×</button>
+      <h2 class="modal-dish-name" id="modal-dish-name"></h2>
+      <p class="modal-count" id="modal-count"></p>
+      <div class="modal-tags" id="modal-tags" hidden></div>
+      <p class="modal-flavor" id="modal-flavor" hidden></p>
+      <ol class="modal-history" id="modal-history"></ol>
+    </div>
+  </div>
+
+  <footer class="site-footer">
+    <p>🥒 조각조각 — Codyssey AI 웹 개발 미션 프로젝트</p>
+  </footer>
+
+  <script src="js/main.js"></script>
+  <script src="js/record.js"></script>
+</body>
+</html>

@@ -1,0 +1,6 @@
+{
+  "framework": null,
+  "redirects": [
+    { "source": "/cutting.html", "destination": "/", "permanent": false }
+  ]
+}
